@@ -3,8 +3,12 @@ package com.oussama.blueshare;
 import android.Manifest;
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
 
@@ -18,6 +22,8 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.provider.MediaStore;
+import android.provider.OpenableColumns;
 import android.provider.Settings;
 import android.util.Log;
 import android.view.View;
@@ -34,6 +40,8 @@ import androidx.navigation.ui.NavigationUI;
 
 import com.oussama.blueshare.databinding.ActivitySendBinding;
 
+import java.io.File;
+
 public class SendActivity extends AppCompatActivity {
 
     private final ActivityResultLauncher<Intent> filePickerLauncher =
@@ -45,15 +53,17 @@ public class SendActivity extends AppCompatActivity {
 
                             if (result.getResultCode() == RESULT_OK && result.getData() != null) {
                                 // Get the selected file's URI
+
                                 Uri fileUri = result.getData().getData();
                                 BluetoothTools.Fileuri = fileUri;
-                                Toast.makeText(SendActivity.this,"Selected file URI: " + fileUri,Toast.LENGTH_SHORT).show();
+
                                 BluetoothTools.scanDevices(SendActivity.this,BluetoothTools.BLUETOOTH_CLIENT);
                                // showBluetoothDevicesDialog();
                             }
                         }
                     }
             );
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -74,6 +84,7 @@ public class SendActivity extends AppCompatActivity {
 
         ImageView sendButton = findViewById(R.id.sendLogo);
         sendButton.setOnClickListener(v -> openFilePicker());
+
 
 
     }

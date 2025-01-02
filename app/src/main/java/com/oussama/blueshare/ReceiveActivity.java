@@ -15,7 +15,9 @@ import androidx.appcompat.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
 import android.widget.ImageView;
+import android.widget.TextView;
 
+import androidx.core.app.ActivityCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -61,8 +63,15 @@ public class ReceiveActivity extends AppCompatActivity {
             acceptThread.start();
             findViewById(R.id.ReceiveWaiting).setVisibility(View.VISIBLE);
             findViewById(R.id.ReceiveStart).setVisibility(View.INVISIBLE);
+            ActivityCompat.requestPermissions(this,new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},10);
         }
         );
+
+    }
+    public void updateReceiving(int persentage){
+        findViewById(R.id.ReceiveWaiting).setVisibility(View.INVISIBLE);
+        findViewById(R.id.ReceivingFile).setVisibility(View.VISIBLE);
+        ((TextView)findViewById(R.id.ReceiveFile)).setText(persentage+"%");
 
     }
     @Override

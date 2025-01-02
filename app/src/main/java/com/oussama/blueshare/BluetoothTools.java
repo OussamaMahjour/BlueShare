@@ -1,6 +1,7 @@
 package com.oussama.blueshare;
 
 import android.Manifest;
+import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothServerSocket;
@@ -10,6 +11,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -17,6 +19,7 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
+import android.provider.OpenableColumns;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -30,6 +33,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -37,7 +41,9 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -131,13 +137,7 @@ public class BluetoothTools {
             }
         }
 
-        int requestCode = 1;
-        Intent discoverableIntent =
-                new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
-        discoverableIntent.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 300);
-        context.startActivityForResult(discoverableIntent, requestCode);
-        IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_FOUND);
-        context.registerReceiver(receiver, filter);
+
         Log.d(TAG, "btnDiscover: Looking for unpaired devices.");
 
         if(bluetoothAdapter.isDiscovering()){
@@ -250,16 +250,15 @@ public class BluetoothTools {
                     streamThread.cancel();
                 }
                 streamThread.sendFile(inputStream);
+            //    streamThread.cancel();
             } catch (FileNotFoundException e) {
                 Log.d(TAG,e.getMessage());
                 streamThread.cancel();
             }
 
-
-
-
-            // Add your logic for managing the connection
         }
+
+
 
         // Closes the client socket and causes the thread to finish.
         public void cancel() {
@@ -323,29 +322,85 @@ public class BluetoothTools {
         }
 
         public void run() {
-            mmBuffer = new byte[1024];
-            int numBytes; // Bytes returned from read()
+            mmBuffer = new byte[1024]; // Buffer size
             ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-            while (true) {
-                try {
-                    // Read the incoming file name
+            String fileName = null;
+            long totalSize = 0; // Total size of the file
+            long bytesReceived = 0; // Tracks bytes received
+
+            try {
+                // Step 1: Read the length of the filename
+                byte[] lengthBuffer = new byte[4];
+                mmInStream.read(lengthBuffer);
+                int filenameLength = ByteBuffer.wrap(lengthBuffer).getInt();
+                Log.d(TAG, "Filename length: " + filenameLength);
+
+                // Step 2: Read the filename
+                byte[] filenameBytes = new byte[filenameLength];
+                mmInStream.read(filenameBytes);
+                fileName = new String(filenameBytes, StandardCharsets.UTF_8);
+                Log.d(TAG, "Filename received: " + fileName);
+
+                if (fileName == null || fileName.isEmpty()) {
+                    Log.e(TAG, "Filename is missing or empty!");
+                    return;
+                }
+
+                // Step 3: Read the total file size
+                byte[] sizeBuffer = new byte[8]; // Long size
+                mmInStream.read(sizeBuffer);
+                totalSize = ByteBuffer.wrap(sizeBuffer).getLong();
+                Log.d(TAG, "File size: " + totalSize);
+
+                // Step 4: Read the file content in chunks
+                int numBytes;
+
+                while (bytesReceived < totalSize) {
                     numBytes = mmInStream.read(mmBuffer);
+                    if (numBytes == -1) break;
+
                     byteArrayOutputStream.write(mmBuffer, 0, numBytes);
-                    break;
+                    bytesReceived += numBytes;
+
+                    // Calculate and log progress
+                    int percentage = (int) ((bytesReceived / (float) totalSize) * 100);
+                    Log.d(TAG, "Progress: " + percentage + "%");
+                    context.runOnUiThread(new Runnable(){
+                        @Override
+                        public void run() {
+                            ((ReceiveActivity)context).updateReceiving(percentage);
+                        }
+                    });
 
 
+
+                    // Optionally update the UI with progress
+
+                }
+
+                // Step 5: File received completely
+                Log.d(TAG, "File received successfully.");
+                context.runOnUiThread(new Runnable(){
+                    @Override
+                    public void run() {
+                        ((TextView)context.findViewById(R.id.ReceiveFile)).setText("✓");
+                    }
+                });
+                byte[] fileData = byteArrayOutputStream.toByteArray();
+                saveReceivedFile(fileData, fileName, context);
+
+            } catch (IOException e) {
+                Log.d(TAG, "Input stream was disconnected", e);
+            } finally {
+                try {
+                    byteArrayOutputStream.close();
                 } catch (IOException e) {
-                    Log.d(TAG, "Input stream was disconnected", e);
-                    break;
+                    Log.e(TAG, "Error closing byte array output stream", e);
                 }
             }
-            Log.d(TAG,"Received file succefully content: ");
-
-            byte[] fileData = byteArrayOutputStream.toByteArray();
-            Log.d(TAG,"file data = "+(new String(fileData,StandardCharsets.UTF_8)));
-            String fileName = "test.txt"; // Change extension as needed
-            saveReceivedFile(fileData, fileName, context);
         }
+
+
 
         // Call this from the main activity to send data to the remote device.
         public void write(byte[] bytes) {
@@ -369,45 +424,113 @@ public class BluetoothTools {
                 handler.sendMessage(writeErrorMsg);
             }
         }
+        private long getFileSize(Uri uri) {
+            long fileSize = 0;
+            try (Cursor cursor = context.getContentResolver().query(uri, null, null, null, null)) {
+                if (cursor != null && cursor.moveToFirst()) {
+                    int sizeIndex = cursor.getColumnIndexOrThrow(OpenableColumns.SIZE);
+                    fileSize = cursor.getLong(sizeIndex);
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Error retrieving file size: ", e);
+            }
+            return fileSize;
+        }
+        public String getFileName(Context context, Uri uri) {
+            String fileName = null;
+            if ("content".equals(uri.getScheme())) {
+                try (Cursor cursor = context.getContentResolver().query(uri, null, null, null, null)) {
+                    if (cursor != null && cursor.moveToFirst()) {
+                        int nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                        fileName = cursor.getString(nameIndex);
+                    }
+                }
+            }
+            // If the scheme is "file", use the path directly
+            if (fileName == null) {
+                fileName = new File(uri.getPath()).getName();
+            }
+            return fileName;
+        }
         public void sendFile(InputStream inputStream) {
             try {
+                String filename = getFileName(context, Fileuri);
+                byte[] filenameBytes = filename.getBytes(StandardCharsets.UTF_8);
+
+                // Send filename length and filename
+                mmOutStream.write(ByteBuffer.allocate(4).putInt(filenameBytes.length).array());
+                mmOutStream.flush();
+                mmOutStream.write(filenameBytes);
+                mmOutStream.flush();
+
+                Log.d(TAG, "Sending File: " + filename);
+
+                long fileSize = getFileSize(Fileuri);
+                byte[] bytes = ByteBuffer.allocate(8).putLong(fileSize).array();
+                mmOutStream.write(bytes);
+                // Get the total file size
+                int totalSize = inputStream.available();
+                int bytesSent = 0;
+
                 byte[] buffer = new byte[1024];
                 int bytesRead;
                 while ((bytesRead = inputStream.read(buffer)) != -1) {
                     mmOutStream.write(buffer, 0, bytesRead);
+                    bytesSent += bytesRead;
+
+                    // Calculate percentage
+                    int percentage = (int) ((bytesSent / (float) totalSize) * 100);
+                    Log.d(TAG, "Progress: " + percentage + "%");
+
+                    // Optionally, update UI with progress (requires passing a callback or handler)
+                    //updateProgressOnUI(percentage);
                 }
                 mmOutStream.flush();
 
-                Log.d(TAG, "File sent successfully: ");
+                Log.d(TAG, "File sent successfully.");
                 inputStream.close();
-            }catch (IOException e) {
-                    Log.e(TAG, "Error occurred while sending file", e);
-                }
+            } catch (IOException e) {
+                Log.e(TAG, "Error occurred while sending file", e);
+            }
         }
-        private static void saveReceivedFile(byte[] fileData, String fileName, Context context) {
-            try {
-                // Define the destination directory (e.g., Downloads folder)
-                File directory = new File( Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "BlueShare");
+        private static void saveReceivedFile(byte[] fileData, String fileName, Activity context) {
 
-                // Create the directory if it doesn't exist
+            File directory;
+
+// Use public Downloads directory
+            if (Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState())) {
+                directory = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "BlueShare");
                 if (!directory.exists()) {
-                    directory.mkdirs();
+                    if (!directory.mkdirs()) {
+                        Log.e(TAG, "Failed to create directory: " + directory.getAbsolutePath());
+                        // Fallback to internal storage
+                        directory = new File(context.getFilesDir(), "BlueShare");
+                        directory.mkdirs();
+                    }
                 }
+            } else {
+                Log.e(TAG, "External storage not available. Using internal storage.");
+                directory = new File(context.getFilesDir(), "BlueShare");
+                directory.mkdirs();
+            }
 
-                // Create the file
-                File file = new File(directory, fileName);
-
+// Create the file
+            File file = new File(directory, fileName);
+            try {
+                if (!file.exists() && file.createNewFile()) {
+                    Log.d(TAG, "File created: " + file.getAbsolutePath());
+                } else {
+                    Log.d(TAG, "File already exists or couldn't be created.");
+                }
 
                 // Write data to the file
                 try (FileOutputStream fos = new FileOutputStream(file)) {
                     fos.write(fileData);
+                    Log.d(TAG, "File saved successfully to: " + file.getAbsolutePath());
                 }
-                Log.d(TAG,"testing here");
 
-                Log.d("SaveFile", "File saved successfully to: " + file.getAbsolutePath());
             } catch (IOException e) {
-                Log.e("SaveFile", "Error saving file", e);
-                Toast.makeText(context, "Error saving file", Toast.LENGTH_SHORT).show();
+                Log.e(TAG, "Error saving file", e);
             }
         }
 

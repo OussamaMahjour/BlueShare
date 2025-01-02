@@ -26,6 +26,7 @@
         android:layout_height="wrap_content"
         android:layout_centerInParent="true"
         android:id="@+id/ReceiveStart"
+        android:visibility="visible"
        >
 
         <ImageView
@@ -81,6 +82,43 @@
             />
 
     </RelativeLayout>
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_centerInParent="true"
+        android:padding="20dp"
+        android:id="@+id/ReceivingFile"
+        android:visibility="invisible"
+        >
+
+        <TextView
+
+            android:layout_width="150dp"
+            android:layout_height="150dp"
+            android:layout_centerHorizontal="true"
+            android:textColor="@color/black"
+            android:id="@+id/ReceiveFile"
+            android:text=""
+            android:textSize="50sp"
+            android:gravity="center"
+
+            />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Getting File"
+
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="20dp"
+            android:textSize="20sp"
+            android:textColor="@color/BlueCiel"
+            android:textStyle="bold"
+            android:layout_below="@id/ReceiveFile"
+
+            />
+
+    </RelativeLayout>
+
 
 
 
