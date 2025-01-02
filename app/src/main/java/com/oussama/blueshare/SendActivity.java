@@ -28,6 +28,7 @@ import android.provider.Settings;
 import android.util.Log;
 import android.view.View;
 import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.core.graphics.Insets;
@@ -97,6 +98,12 @@ public class SendActivity extends AppCompatActivity {
 
         // Launch the file picker
         filePickerLauncher.launch(intent);
+    }
+    public  void updateSending(int persentage){
+        findViewById(R.id.SendLogoLayout).setVisibility(View.INVISIBLE);
+        findViewById(R.id.SendingFile).setVisibility(View.VISIBLE);
+        ((TextView)findViewById(R.id.SendFile)).setText(persentage+"%");
+
     }
 
     @Override

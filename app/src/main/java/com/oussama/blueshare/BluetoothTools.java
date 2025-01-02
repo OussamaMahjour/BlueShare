@@ -64,6 +64,7 @@ public class BluetoothTools {
     public static String TAG = "BluetoothTools";
 
     public static Uri Fileuri ;
+    public static  BottomSheetDialog dialog;
     private final static BroadcastReceiver receiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -176,7 +177,7 @@ public class BluetoothTools {
         }
     }
     private static void showBluetoothDevicesDialog(AppCompatActivity context) {
-        BottomSheetDialog dialog = new BottomSheetDialog(context);
+        dialog = new BottomSheetDialog(context);
         View view = LayoutInflater.from(context).inflate(R.layout.bottom_sheet_devices, null);
         dialog.setContentView(view);
 
@@ -474,6 +475,8 @@ public class BluetoothTools {
 
                 byte[] buffer = new byte[1024];
                 int bytesRead;
+                dialog.dismiss();
+
                 while ((bytesRead = inputStream.read(buffer)) != -1) {
                     mmOutStream.write(buffer, 0, bytesRead);
                     bytesSent += bytesRead;
@@ -481,11 +484,22 @@ public class BluetoothTools {
                     // Calculate percentage
                     int percentage = (int) ((bytesSent / (float) totalSize) * 100);
                     Log.d(TAG, "Progress: " + percentage + "%");
-
+                    context.runOnUiThread(new Runnable(){
+                        @Override
+                        public void run() {
+                            ((SendActivity)context).updateSending(percentage);
+                        }
+                    });
                     // Optionally, update UI with progress (requires passing a callback or handler)
-                    //updateProgressOnUI(percentage);
+
                 }
                 mmOutStream.flush();
+                context.runOnUiThread(new Runnable(){
+                    @Override
+                    public void run() {
+                        ((TextView)context.findViewById(R.id.SendFile)).setText("✓");
+                    }
+                });
 
                 Log.d(TAG, "File sent successfully.");
                 inputStream.close();

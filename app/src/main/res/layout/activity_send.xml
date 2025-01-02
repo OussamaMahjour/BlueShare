@@ -23,7 +23,9 @@
     <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_centerInParent="true">
+        android:layout_centerInParent="true"
+        android:id="@+id/SendLogoLayout"
+        android:visibility="visible">
 
         <ImageView
             android:layout_width="150dp"
@@ -42,6 +44,42 @@
             android:textSize="20sp"
             android:textColor="@color/white"
             android:textStyle="bold"
+
+            />
+
+    </RelativeLayout>
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_centerInParent="true"
+        android:padding="20dp"
+        android:id="@+id/SendingFile"
+        android:visibility="invisible"
+        >
+
+        <TextView
+
+            android:layout_width="150dp"
+            android:layout_height="150dp"
+            android:layout_centerHorizontal="true"
+            android:textColor="@color/white"
+            android:id="@+id/SendFile"
+            android:text=""
+            android:textSize="50sp"
+            android:gravity="center"
+
+            />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Sending File"
+
+            android:layout_centerHorizontal="true"
+            android:layout_marginTop="20dp"
+            android:textSize="20sp"
+            android:textColor="@color/white"
+            android:textStyle="bold"
+            android:layout_below="@id/SendFile"
 
             />
 
