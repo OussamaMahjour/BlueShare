@@ -387,7 +387,7 @@ public class BluetoothTools {
         private static void saveReceivedFile(byte[] fileData, String fileName, Context context) {
             try {
                 // Define the destination directory (e.g., Downloads folder)
-                File directory = new File( Environment.getExternalStorageDirectory(), "BlueShare");
+                File directory = new File( Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "BlueShare");
 
                 // Create the directory if it doesn't exist
                 if (!directory.exists()) {
