@@ -1,6 +1,9 @@
 package com.oussama.blueshare;
 
 import android.Manifest;
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.ObjectAnimator;
 import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -9,6 +12,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
+import android.media.Image;
 import android.net.Uri;
 import android.os.Bundle;
 
@@ -84,7 +88,10 @@ public class SendActivity extends AppCompatActivity {
         BluetoothTools.enableBluetooth(this);
 
         ImageView sendButton = findViewById(R.id.sendLogo);
-        sendButton.setOnClickListener(v -> openFilePicker());
+        sendButton.setOnClickListener(v -> {
+            openFilePicker();
+
+        });
 
 
 
@@ -104,6 +111,25 @@ public class SendActivity extends AppCompatActivity {
         findViewById(R.id.SendingFile).setVisibility(View.VISIBLE);
         ((TextView)findViewById(R.id.SendFile)).setText(persentage+"%");
 
+    }
+    public void flipAnimation() {
+        // Create the flip effect (180 degrees rotation)
+        TextView image = findViewById(R.id.SendFile);
+        ObjectAnimator flipOut = ObjectAnimator.ofFloat(image, "rotationY", 0f, 180f);
+        flipOut.setDuration(500); // Duration of the flip-out animation
+
+        flipOut.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                // After flip-out is complete, change the text and flip back to show it
+                image.setText("Done");
+                ObjectAnimator flipIn = ObjectAnimator.ofFloat(image, "rotationY", 180f, 360f);
+                flipIn.setDuration(500); // Duration of the flip-in animation
+                flipIn.start();
+            }
+        });
+
+        flipOut.start();
     }
 
     @Override

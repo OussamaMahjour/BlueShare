@@ -26,6 +26,7 @@ import androidx.navigation.Navigation;
 import androidx.navigation.ui.AppBarConfiguration;
 import androidx.navigation.ui.NavigationUI;
 
+import com.oussama.blueshare.Threads.AcceptThread;
 import com.oussama.blueshare.databinding.ActivityReceiveBinding;
 
 public class ReceiveActivity extends AppCompatActivity {
@@ -51,7 +52,7 @@ public class ReceiveActivity extends AppCompatActivity {
         BluetoothTools.enableBluetooth(this);
         ImageView receiveButton = findViewById(R.id.receiveLog);
 
-        BluetoothTools.AcceptThread acceptThread = new BluetoothTools.AcceptThread(this);
+        AcceptThread acceptThread = new AcceptThread(this);
 
         Intent discoverableIntent =
                 new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
