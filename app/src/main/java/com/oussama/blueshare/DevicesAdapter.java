@@ -36,6 +36,7 @@ public DeviceViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewTy
 @Override
 public void onBindViewHolder(@NonNull DeviceViewHolder holder, int position) {
     holder.deviceNameTextView.setText(devices.get(position).getName());
+    holder.paringText.setTag(devices.get(position).getName());
     BluetoothDevice device = devices.get(position);
     holder.deviceNameTextView.setOnClickListener(v->onDeviceClickListener.onDeviceClick(device,v.getRootView()));
 

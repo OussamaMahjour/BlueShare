@@ -2,6 +2,7 @@ package com.oussama.blueshare;
 
 import android.Manifest;
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothSocket;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
@@ -27,7 +28,9 @@ import androidx.navigation.ui.AppBarConfiguration;
 import androidx.navigation.ui.NavigationUI;
 
 import com.oussama.blueshare.Threads.AcceptThread;
+import com.oussama.blueshare.Threads.StreamThread;
 import com.oussama.blueshare.databinding.ActivityReceiveBinding;
+import com.oussama.blueshare.tools.BluetoothTools;
 
 public class ReceiveActivity extends AppCompatActivity {
 
@@ -52,7 +55,10 @@ public class ReceiveActivity extends AppCompatActivity {
         BluetoothTools.enableBluetooth(this);
         ImageView receiveButton = findViewById(R.id.receiveLog);
 
-        AcceptThread acceptThread = new AcceptThread(this);
+        AcceptThread acceptThread = new AcceptThread(this,(socket)->{
+            StreamThread streamThread  = new StreamThread(socket,ReceiveActivity.this);
+            streamThread.start();
+        });
 
         Intent discoverableIntent =
                 new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
@@ -65,8 +71,10 @@ public class ReceiveActivity extends AppCompatActivity {
             findViewById(R.id.ReceiveWaiting).setVisibility(View.VISIBLE);
             findViewById(R.id.ReceiveStart).setVisibility(View.INVISIBLE);
             ActivityCompat.requestPermissions(this,new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},10);
+
         }
         );
+
 
     }
     public void updateReceiving(int persentage){
@@ -84,7 +92,7 @@ public class ReceiveActivity extends AppCompatActivity {
             } else {
                 Log.d("BluePermission","Permission not granted");
             }
-        }else if(requestCode ==BluetoothTools.REQUEST_ENABLE_BLUETOOTH){
+        }else if(requestCode == BluetoothTools.REQUEST_ENABLE_BLUETOOTH){
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 BluetoothTools.bluetoothAdapter.enable();
                 Log.d("BluePermission","Bluetooth Enabled");

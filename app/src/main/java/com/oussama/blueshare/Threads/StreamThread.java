@@ -1,6 +1,7 @@
 package com.oussama.blueshare.Threads;
 
 import android.app.Activity;
+import android.bluetooth.BluetoothServerSocket;
 import android.bluetooth.BluetoothSocket;
 import android.content.Context;
 import android.database.Cursor;
@@ -16,10 +17,11 @@ import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
 
-import com.oussama.blueshare.BluetoothTools;
+import com.oussama.blueshare.tools.BluetoothTools;
 import com.oussama.blueshare.R;
 import com.oussama.blueshare.ReceiveActivity;
 import com.oussama.blueshare.SendActivity;
+import com.oussama.blueshare.tools.StorageTools;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -29,15 +31,17 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.Timer;
+import java.util.TimerTask;
 
 public  class StreamThread extends Thread{
-    private String TAG="StreamThread";
-    private  Handler handler ;
+    private static final String TAG="StreamThread";
+    private static  Handler handler ;
     private final BluetoothSocket mmSocket;
-    private final InputStream mmInStream;
-    private final OutputStream mmOutStream;
-    private byte[] mmBuffer; // mmBuffer store for the stream
-    private interface MessageConstants {
+    private static InputStream mmInStream;
+    private static  OutputStream mmOutStream;
+    private static byte[] mmBuffer = new byte[1024]; // mmBuffer store for the stream
+    private interface Messages {
         public static final int MESSAGE_READ = 0;
         public static final int MESSAGE_WRITE = 1;
         public static final int MESSAGE_TOAST = 2;
@@ -49,21 +53,24 @@ public  class StreamThread extends Thread{
     public StreamThread(BluetoothSocket socket,AppCompatActivity context) {
         this.context = context;
         handler = handler = new Handler(Looper.getMainLooper(), message -> {
-            if (message.what == MessageConstants.MESSAGE_READ) {
-                byte[] readBuf = (byte[]) message.obj;
-                String receivedMessage = new String(readBuf, 0, message.arg1);
-                Log.d("SocketData", "Received: " + receivedMessage);
-
-                // Optionally update the UI with the received message
+            byte[] readBuf = (byte[]) message.obj;
+            String Message = new String(readBuf, 0, message.arg1);
+            switch (message.what){
+                case Messages.MESSAGE_READ:
+                    Log.d(TAG, "Data Received: "+Message);
+                    break;
+                case Messages.MESSAGE_WRITE:
+                    Log.d(TAG,"Writing to socket "+Message);
+                    break;
+                case Messages.MESSAGE_TOAST:
+                    Log.d(TAG,"Received message :"+Message);
+                    break;
             }
-            return true; // Indicates that the message has been handled
+            return true;
         });
         mmSocket = socket;
         InputStream tmpIn = null;
         OutputStream tmpOut = null;
-
-        // Get the input and output streams; using temp objects because
-        // member streams are final.
         try {
             tmpIn = socket.getInputStream();
         } catch (IOException e) {
@@ -81,7 +88,9 @@ public  class StreamThread extends Thread{
 
     }
 
+
     public void run() {
+
         mmBuffer = new byte[1024]; // Buffer size
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
         String fileName = null;
@@ -131,11 +140,6 @@ public  class StreamThread extends Thread{
                         ((ReceiveActivity)context).updateReceiving(percentage);
                     }
                 });
-
-
-
-                // Optionally update the UI with progress
-
             }
 
             // Step 5: File received completely
@@ -147,7 +151,7 @@ public  class StreamThread extends Thread{
                 }
             });
             byte[] fileData = byteArrayOutputStream.toByteArray();
-            saveReceivedFile(fileData, fileName, context);
+            StorageTools.saveReceivedFile(fileData, fileName, context);
 
         } catch (IOException e) {
             Log.d(TAG, "Input stream was disconnected", e);
@@ -160,23 +164,34 @@ public  class StreamThread extends Thread{
         }
     }
 
+    public static void sendMessage(String message,OutputStream outputStream){
+        try {
+            outputStream.write(message.getBytes());
+            Message msg = handler.obtainMessage(Messages.MESSAGE_TOAST,-1,-1,mmBuffer);
+            msg.sendToTarget();
+        } catch (IOException e) {
+            Log.e(TAG, "Error occurred when sending data", e);
+        }
+    }
+    public static void listenForMessage(BluetoothSocket socket, AppCompatActivity context){
+        StreamThread streamThread = new StreamThread(socket,context);
+        streamThread.start();
+    }
+
 
 
     // Call this from the main activity to send data to the remote device.
     public void write(byte[] bytes) {
         try {
             mmOutStream.write(bytes);
-
-            // Share the sent message with the UI activity.
-            Message writtenMsg = handler.obtainMessage(
-                   MessageConstants.MESSAGE_WRITE, -1, -1, mmBuffer);
+            Message writtenMsg = handler.obtainMessage(Messages.MESSAGE_WRITE, -1, -1, mmBuffer);
             writtenMsg.sendToTarget();
         } catch (IOException e) {
             Log.e(TAG, "Error occurred when sending data", e);
 
             // Send a failure message back to the activity.
             Message writeErrorMsg =
-                    handler.obtainMessage(MessageConstants.MESSAGE_TOAST);
+                    handler.obtainMessage(Messages.MESSAGE_TOAST);
             Bundle bundle = new Bundle();
             bundle.putString("toast",
                     "Couldn't send data to the other device");
@@ -184,37 +199,21 @@ public  class StreamThread extends Thread{
             handler.sendMessage(writeErrorMsg);
         }
     }
-    private long getFileSize(Uri uri) {
-        long fileSize = 0;
-        try (Cursor cursor = context.getContentResolver().query(uri, null, null, null, null)) {
-            if (cursor != null && cursor.moveToFirst()) {
-                int sizeIndex = cursor.getColumnIndexOrThrow(OpenableColumns.SIZE);
-                fileSize = cursor.getLong(sizeIndex);
+
+
+    public void sendFile(InputStream inputStream,Uri Fileuri) {
+        Timer timer = new Timer();
+
+        // Schedule the task
+        timer.schedule(new TimerTask() {
+            @Override
+            public void run() {
+                System.out.println("Running task at " + System.currentTimeMillis());
+                // Your code here...
             }
-        } catch (Exception e) {
-            Log.e(TAG, "Error retrieving file size: ", e);
-        }
-        return fileSize;
-    }
-    public String getFileName(Context context, Uri uri) {
-        String fileName = null;
-        if ("content".equals(uri.getScheme())) {
-            try (Cursor cursor = context.getContentResolver().query(uri, null, null, null, null)) {
-                if (cursor != null && cursor.moveToFirst()) {
-                    int nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
-                    fileName = cursor.getString(nameIndex);
-                }
-            }
-        }
-        // If the scheme is "file", use the path directly
-        if (fileName == null) {
-            fileName = new File(uri.getPath()).getName();
-        }
-        return fileName;
-    }
-    public void sendFile(InputStream inputStream) {
+        }, 0, 1000);
         try {
-            String filename = getFileName(context, BluetoothTools.Fileuri);
+            String filename = StorageTools.getFileName(context,Fileuri);
             byte[] filenameBytes = filename.getBytes(StandardCharsets.UTF_8);
 
             // Send filename length and filename
@@ -225,7 +224,7 @@ public  class StreamThread extends Thread{
 
             Log.d(TAG, "Sending File: " + filename);
 
-            long fileSize = getFileSize(BluetoothTools.Fileuri);
+            long fileSize = StorageTools.getFileSize(Fileuri,context);
             byte[] bytes = ByteBuffer.allocate(8).putLong(fileSize).array();
             mmOutStream.write(bytes);
             // Get the total file size
@@ -234,7 +233,7 @@ public  class StreamThread extends Thread{
 
             byte[] buffer = new byte[1024];
             int bytesRead;
-            BluetoothTools.dialog.dismiss();
+
 
             while ((bytesRead = inputStream.read(buffer)) != -1) {
                 mmOutStream.write(buffer, 0, bytesRead);
@@ -249,64 +248,19 @@ public  class StreamThread extends Thread{
                         ((SendActivity)context).updateSending(percentage);
                     }
                 });
-                // Optionally, update UI with progress (requires passing a callback or handler)
 
             }
             mmOutStream.flush();
-            context.runOnUiThread(new Runnable(){
-                @Override
-                public void run() {
-                    ((SendActivity)context).flipAnimation();
-                    //  ((TextView)context.findViewById(R.id.SendFile)).setText("✓");
-                }
-            });
+
 
             Log.d(TAG, "File sent successfully.");
-            inputStream.close();
+
         } catch (IOException e) {
             Log.e(TAG, "Error occurred while sending file", e);
         }
+
     }
-    private  void saveReceivedFile(byte[] fileData, String fileName, Activity context) {
 
-        File directory;
-
-// Use public Downloads directory
-        if (Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState())) {
-            directory = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "BlueShare");
-            if (!directory.exists()) {
-                if (!directory.mkdirs()) {
-                    Log.e(TAG, "Failed to create directory: " + directory.getAbsolutePath());
-                    // Fallback to internal storage
-                    directory = new File(context.getFilesDir(), "BlueShare");
-                    directory.mkdirs();
-                }
-            }
-        } else {
-            Log.e(TAG, "External storage not available. Using internal storage.");
-            directory = new File(context.getFilesDir(), "BlueShare");
-            directory.mkdirs();
-        }
-
-// Create the file
-        File file = new File(directory, fileName);
-        try {
-            if (!file.exists() && file.createNewFile()) {
-                Log.d(TAG, "File created: " + file.getAbsolutePath());
-            } else {
-                Log.d(TAG, "File already exists or couldn't be created.");
-            }
-
-            // Write data to the file
-            try (FileOutputStream fos = new FileOutputStream(file)) {
-                fos.write(fileData);
-                Log.d(TAG, "File saved successfully to: " + file.getAbsolutePath());
-            }
-
-        } catch (IOException e) {
-            Log.e(TAG, "Error saving file", e);
-        }
-    }
 
 
     // Call this method from the main activity to shut down the connection.

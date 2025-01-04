@@ -1,24 +1,15 @@
 package com.oussama.blueshare;
 
-import android.Manifest;
-import android.animation.Animator;
-import android.animation.AnimatorListenerAdapter;
-import android.animation.ObjectAnimator;
-import android.app.Activity;
-import android.bluetooth.BluetoothAdapter;
+
 import android.bluetooth.BluetoothDevice;
-import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
 import android.content.pm.PackageManager;
-import android.database.Cursor;
-import android.media.Image;
+
 import android.net.Uri;
 import android.os.Bundle;
 
-import com.google.android.material.snackbar.Snackbar;
-
 import androidx.activity.EdgeToEdge;
+
 import androidx.activity.result.ActivityResult;
 import androidx.activity.result.ActivityResultCallback;
 import androidx.activity.result.ActivityResultLauncher;
@@ -26,29 +17,37 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
-import android.provider.MediaStore;
-import android.provider.OpenableColumns;
-import android.provider.Settings;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
-import androidx.navigation.NavController;
-import androidx.navigation.Navigation;
-import androidx.navigation.ui.AppBarConfiguration;
-import androidx.navigation.ui.NavigationUI;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
-import com.oussama.blueshare.databinding.ActivitySendBinding;
+import com.google.android.material.bottomsheet.BottomSheetDialog;
+import com.oussama.blueshare.Threads.ConnectThread;
+import com.oussama.blueshare.Threads.StreamThread;
+import com.oussama.blueshare.tools.BluetoothTools;
+import com.oussama.blueshare.tools.StorageTools;
+
+import org.w3c.dom.Text;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 
 public class SendActivity extends AppCompatActivity {
+    private Uri Fileuri;
 
+    private static List<BluetoothDevice> devicesList = new ArrayList<>();
+    private static DevicesAdapter adapter;
+    public static BottomSheetDialog dialog;
     private final ActivityResultLauncher<Intent> filePickerLauncher =
             registerForActivityResult(
                     new ActivityResultContracts.StartActivityForResult(),
@@ -57,13 +56,15 @@ public class SendActivity extends AppCompatActivity {
                         public void onActivityResult(ActivityResult result) {
 
                             if (result.getResultCode() == RESULT_OK && result.getData() != null) {
-                                // Get the selected file's URI
-
                                 Uri fileUri = result.getData().getData();
-                                BluetoothTools.Fileuri = fileUri;
-
-                                BluetoothTools.scanDevices(SendActivity.this,BluetoothTools.BLUETOOTH_CLIENT);
-                               // showBluetoothDevicesDialog();
+                                Fileuri = fileUri;
+                                BluetoothTools.scanDevices(SendActivity.this,(device)->{
+                                    if(!devicesList.contains(device)){
+                                        devicesList.add(device);
+                                        adapter.notifyDataSetChanged();
+                                    }
+                                });
+                                showDevices();
                             }
                         }
                     }
@@ -80,58 +81,45 @@ public class SendActivity extends AppCompatActivity {
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
             return insets;
         });
-        this.requestPermissions(new String[]{
-                Manifest.permission.BLUETOOTH_SCAN,
-                Manifest.permission.BLUETOOTH_CONNECT,
-                Manifest.permission.BLUETOOTH_ADVERTISE
-        },12);
+
+        BluetoothTools.requestPermissions(this);
         BluetoothTools.enableBluetooth(this);
+
+        adapter = new DevicesAdapter(devicesList, new DevicesAdapter.OnDeviceClickListener() {
+            @Override
+            public void onDeviceClick(BluetoothDevice device,View v) {
+               BluetoothTools.sendFile(Fileuri,device,SendActivity.this);
+                v.findViewWithTag(device.getName()).setVisibility(View.VISIBLE);
+            }
+        });
 
         ImageView sendButton = findViewById(R.id.sendLogo);
         sendButton.setOnClickListener(v -> {
-            openFilePicker();
+            StorageTools.openFilePicker(this,filePickerLauncher);
 
         });
 
 
 
+
     }
 
-    private void openFilePicker() {
-        // Create an intent to pick files
-        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-        intent.setType("*/*"); // Set the type of files you want to allow
-        intent.addCategory(Intent.CATEGORY_OPENABLE); // Only show files that can be opened
 
-        // Launch the file picker
-        filePickerLauncher.launch(intent);
-    }
     public  void updateSending(int persentage){
         findViewById(R.id.SendLogoLayout).setVisibility(View.INVISIBLE);
         findViewById(R.id.SendingFile).setVisibility(View.VISIBLE);
         ((TextView)findViewById(R.id.SendFile)).setText(persentage+"%");
 
     }
-    public void flipAnimation() {
-        // Create the flip effect (180 degrees rotation)
-        TextView image = findViewById(R.id.SendFile);
-        ObjectAnimator flipOut = ObjectAnimator.ofFloat(image, "rotationY", 0f, 180f);
-        flipOut.setDuration(500); // Duration of the flip-out animation
-
-        flipOut.addListener(new AnimatorListenerAdapter() {
-            @Override
-            public void onAnimationEnd(Animator animation) {
-                // After flip-out is complete, change the text and flip back to show it
-                image.setText("Done");
-                ObjectAnimator flipIn = ObjectAnimator.ofFloat(image, "rotationY", 180f, 360f);
-                flipIn.setDuration(500); // Duration of the flip-in animation
-                flipIn.start();
-            }
-        });
-
-        flipOut.start();
+    private void showDevices(){
+        dialog = new BottomSheetDialog(this);
+        View view = LayoutInflater.from(this).inflate(R.layout.bottom_sheet_devices, null);
+        dialog.setContentView(view);
+        RecyclerView recyclerView = view.findViewById(R.id.devicesRecyclerView);
+        recyclerView.setLayoutManager(new LinearLayoutManager(this));
+        recyclerView.setAdapter(adapter);
+        dialog.show();
     }
-
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
@@ -141,7 +129,7 @@ public class SendActivity extends AppCompatActivity {
             } else {
                 Log.d("BluePermission","Permission not granted");
             }
-        }else if(requestCode ==BluetoothTools.REQUEST_ENABLE_BLUETOOTH){
+        }else if(requestCode == BluetoothTools.REQUEST_ENABLE_BLUETOOTH){
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 BluetoothTools.bluetoothAdapter.enable();
                 Log.d("BluePermission","Permission granted");

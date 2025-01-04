@@ -8,24 +8,32 @@ import android.util.Log;
 
 import androidx.appcompat.app.AppCompatActivity;
 
-import com.oussama.blueshare.BluetoothTools;
+import com.oussama.blueshare.SendActivity;
+import com.oussama.blueshare.tools.BluetoothTools;
 
 import java.io.IOException;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 public  class AcceptThread extends Thread {
-    private final String TAG="AcceptThread";
+    private static final String TAG="AcceptThread";
     private final BluetoothServerSocket mmServerSocket;
-    private volatile boolean isRunning = false;
+    public static BluetoothSocket mmSocket;
+    private static boolean  isPaired= false;
+    private AppCompatActivity context;
 
-    private static AppCompatActivity context;
+    /**
+     * the function that will be running ones the connections is established
+     * */
+    public interface OnAccept extends Consumer<BluetoothSocket>{};
+
+    private OnAccept onAccept;
+
     @SuppressLint("MissingPermission")
-    public AcceptThread(AppCompatActivity context) {
-        this.context = context;
-
-        // Use a temporary object that is later assigned to mmServerSocket
-        // because mmServerSocket is final.
+    public AcceptThread(AppCompatActivity context,OnAccept onAccept) {
         BluetoothServerSocket tmp = null;
+        this.context = context;
+        this.onAccept = onAccept;
         try {
             // MY_UUID is the app's UUID string, also used by the client code.
             UUID uuid = BluetoothTools.APP_UUID;
@@ -37,45 +45,43 @@ public  class AcceptThread extends Thread {
     }
 
     public void run() {
-        if(isRunning)return;
-        BluetoothSocket socket = null;
-        isRunning = true;
-        // Keep listening until exception occurs or a socket is returned.
-        while (isRunning) {
+        if(isPaired){
             try {
-                socket = mmServerSocket.accept();
+                mmServerSocket.close();
+                isPaired = false;
+
+
             } catch (IOException e) {
-                Log.e(TAG, "Socket's accept() method failed", e);
-                break;
-            }
-
-            if (socket != null) {
-                // A connection was accepted. Perform work associated with
-                // the connection in a separate thread.
-                AcceptThread.manageConnectedSocket(socket);
-
-                break;
+                Log.d(TAG,"Couldn't Close the server socket");
             }
         }
+        BluetoothSocket socket = null;
+        try {
+            socket = mmServerSocket.accept();
+            isPaired = true;
+            onAccept.accept(socket);
+        } catch (IOException e) {
+            Log.e(TAG, "Socket's accept() method failed", e);
+            return;
+        }
     }
-
-
-    // Closes the connect socket and causes the thread to finish.
     public void cancel() {
-        isRunning = false;
         try {
             mmServerSocket.close();
+            isPaired = false;
         } catch (IOException e) {
             Log.e(TAG, "Could not close the connect socket", e);
         }
     }
-    private static void manageConnectedSocket(BluetoothSocket socket) {
-        // Start a new thread to manage the connected socket
-        Log.d("Bluetooth", "Connection accepted. Manage the socket.");
-        StreamThread streamThread = new StreamThread(socket,context);
-        streamThread.start();
+    public  static BluetoothSocket getConnectedSocket() {
+        Log.d(TAG, "Connection accepted. Manage the socket.");
+        if(isPaired){
+            return mmSocket;
+        }
+        else{
+            return null;
+        }
 
 
-        // Add your logic for managing the connection
     }
 }

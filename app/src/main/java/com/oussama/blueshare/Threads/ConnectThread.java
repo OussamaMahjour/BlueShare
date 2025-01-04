@@ -13,28 +13,31 @@ import android.util.Log;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 
-import com.oussama.blueshare.BluetoothTools;
+import com.oussama.blueshare.tools.BluetoothTools;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
+import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 public  class ConnectThread extends Thread {
-    private  BluetoothSocket mmSocket;
-    private  BluetoothDevice mmDevice;
-    private  AppCompatActivity context;
-    public  boolean isPairing= false;
-    private String TAG="ConnectThread";
-    public Uri Fileuri;
+    public static  BluetoothSocket mmSocket;
+    public static boolean isPaired= false;
+    public static String TAG="ConnectThread";
+    public interface OnConnect extends Consumer<BluetoothSocket>{};
+    private final OnConnect onConnect ;
+
 
 
     @SuppressLint("MissingPermission")
-    public ConnectThread(BluetoothDevice device, AppCompatActivity context) {
-        this.context = context;
+    public ConnectThread(BluetoothDevice device,OnConnect onConnect) {
+        this.onConnect = onConnect;
         BluetoothSocket tmp = null;
-        mmDevice = device;
         UUID uuid = BluetoothTools.APP_UUID;
         try {
             tmp = device.createRfcommSocketToServiceRecord(uuid);
@@ -46,17 +49,25 @@ public  class ConnectThread extends Thread {
 
     @SuppressLint("MissingPermission")
     public void run() {
-        if(isPairing)return;
+        if(isPaired) {
+            try {
+                mmSocket.close();
+                isPaired=false;
+            } catch (IOException e) {
+                Log.d(TAG,"Couldn't Close the socket");
+            }
+
+        }
+
         try {
             BluetoothAdapter.getDefaultAdapter().cancelDiscovery();
         }catch (Exception e){
             Log.d(TAG,"Couldn't cancel the discovery error:"+e.getMessage());
         }
         try {
-            // Connect to the remote device through the socket. This call blocks
-            // until it succeeds or throws an exception.
-            isPairing = true;
             mmSocket.connect();
+            isPaired = true;
+            onConnect.accept(mmSocket);
 
         } catch (IOException connectException) {
             Log.e(TAG, "Enable to Connect to socket "+connectException.getMessage());
@@ -67,30 +78,11 @@ public  class ConnectThread extends Thread {
             }
             return;
         }
-        manageConnectedSocket(mmSocket);
     }
-    private  void manageConnectedSocket(BluetoothSocket socket)  {
-        Log.d(TAG, "Connection accepted. Manage the socket.");
-        StreamThread streamThread = new StreamThread(socket,context);
-        try {
-            InputStream inputStream = context.getContentResolver().openInputStream(Fileuri);
-            if (inputStream == null) {
-                Log.e(TAG, "InputStream is null for the selected file.");
-                streamThread.cancel();
-            }
-            streamThread.sendFile(inputStream);
-            //    streamThread.cancel();
-        } catch (FileNotFoundException e) {
-            Log.d(TAG,e.getMessage());
-            streamThread.cancel();
-        }
-
-    }
-
     public void cancel() {
-        try {
-            isPairing = false;
+        try{
             mmSocket.close();
+            isPaired=false;
         } catch (IOException e) {
             Log.e(TAG, "Could not close the client socket", e);
         }
