@@ -1,6 +1,7 @@
 package com.oussama.blueshare.Threads;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.bluetooth.BluetoothServerSocket;
 import android.bluetooth.BluetoothSocket;
 import android.content.Context;
@@ -13,6 +14,7 @@ import android.os.Looper;
 import android.os.Message;
 import android.provider.OpenableColumns;
 import android.util.Log;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -30,6 +32,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.ByteBuffer;
+import java.nio.LongBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -52,7 +55,7 @@ public  class StreamThread extends Thread{
 
     public StreamThread(BluetoothSocket socket,AppCompatActivity context) {
         this.context = context;
-        handler = handler = new Handler(Looper.getMainLooper(), message -> {
+        handler  = new Handler(Looper.getMainLooper(), message -> {
             byte[] readBuf = (byte[]) message.obj;
             String Message = new String(readBuf, 0, message.arg1);
             switch (message.what){
@@ -91,11 +94,10 @@ public  class StreamThread extends Thread{
 
     public void run() {
 
-        mmBuffer = new byte[1024]; // Buffer size
+        mmBuffer = new byte[1024];
         ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
         String fileName = null;
-        long totalSize = 0; // Total size of the file
-        long bytesReceived = 0; // Tracks bytes received
+
 
         try {
             // Step 1: Read the length of the filename
@@ -103,8 +105,6 @@ public  class StreamThread extends Thread{
             mmInStream.read(lengthBuffer);
             int filenameLength = ByteBuffer.wrap(lengthBuffer).getInt();
             Log.d(TAG, "Filename length: " + filenameLength);
-
-            // Step 2: Read the filename
             byte[] filenameBytes = new byte[filenameLength];
             mmInStream.read(filenameBytes);
             fileName = new String(filenameBytes, StandardCharsets.UTF_8);
@@ -114,7 +114,8 @@ public  class StreamThread extends Thread{
                 Log.e(TAG, "Filename is missing or empty!");
                 return;
             }
-
+            long totalSize = 0; // Total size of the file
+            long bytesReceived = 0; // Tracks bytes received
             // Step 3: Read the total file size
             byte[] sizeBuffer = new byte[8]; // Long size
             mmInStream.read(sizeBuffer);
@@ -147,11 +148,22 @@ public  class StreamThread extends Thread{
             context.runOnUiThread(new Runnable(){
                 @Override
                 public void run() {
-                    ((TextView)context.findViewById(R.id.ReceiveFile)).setText("✓");
+                    TextView receivefile = ((TextView)(context.findViewById(R.id.ReceiveFile)));
+                    ((ReceiveActivity)context).flipCard(receivefile);
                 }
             });
+
+            byte[] messageBuffer =   ByteBuffer.allocate(8).putLong(200).array();
+            mmOutStream.write(messageBuffer);
+            mmOutStream.flush();
+
+            mmOutStream.close();
+
             byte[] fileData = byteArrayOutputStream.toByteArray();
             StorageTools.saveReceivedFile(fileData, fileName, context);
+
+
+
 
         } catch (IOException e) {
             Log.d(TAG, "Input stream was disconnected", e);
@@ -163,6 +175,8 @@ public  class StreamThread extends Thread{
             }
         }
     }
+
+
 
     public static void sendMessage(String message,OutputStream outputStream){
         try {
@@ -209,16 +223,13 @@ public  class StreamThread extends Thread{
             @Override
             public void run() {
                 System.out.println("Running task at " + System.currentTimeMillis());
-                // Your code here...
+                if(mmSocket.isConnected()) timer.cancel();
             }
-        }, 0, 1000);
+        }, 0, 500);
         try {
             String filename = StorageTools.getFileName(context,Fileuri);
             byte[] filenameBytes = filename.getBytes(StandardCharsets.UTF_8);
-
-            // Send filename length and filename
             mmOutStream.write(ByteBuffer.allocate(4).putInt(filenameBytes.length).array());
-            mmOutStream.flush();
             mmOutStream.write(filenameBytes);
             mmOutStream.flush();
 
@@ -227,21 +238,14 @@ public  class StreamThread extends Thread{
             long fileSize = StorageTools.getFileSize(Fileuri,context);
             byte[] bytes = ByteBuffer.allocate(8).putLong(fileSize).array();
             mmOutStream.write(bytes);
-            // Get the total file size
             int totalSize = inputStream.available();
             int bytesSent = 0;
-
             byte[] buffer = new byte[1024];
             int bytesRead;
-
-
             while ((bytesRead = inputStream.read(buffer)) != -1) {
                 mmOutStream.write(buffer, 0, bytesRead);
                 bytesSent += bytesRead;
-
-                // Calculate percentage
                 int percentage = (int) ((bytesSent / (float) totalSize) * 100);
-                Log.d(TAG, "Progress: " + percentage + "%");
                 context.runOnUiThread(new Runnable(){
                     @Override
                     public void run() {
@@ -254,6 +258,22 @@ public  class StreamThread extends Thread{
 
 
             Log.d(TAG, "File sent successfully.");
+            context.runOnUiThread(new Runnable(){
+                @Override
+                public void run() {
+                    TextView sendfile = ((TextView)(context.findViewById(R.id.SendFile)));
+                    ((SendActivity)context).flipCard(sendfile);
+                }
+            });
+            byte[] message = new byte[8];
+            mmInStream.read(message);
+            long messageData =  ByteBuffer.wrap(message).getLong();
+            if(messageData==200){
+                inputStream.close();
+                this.cancel();
+                Log.d(TAG,"Cancling the socket");
+            }
+
 
         } catch (IOException e) {
             Log.e(TAG, "Error occurred while sending file", e);

@@ -1,6 +1,9 @@
 package com.oussama.blueshare;
 
 
+import android.animation.Animator;
+import android.animation.AnimatorListenerAdapter;
+import android.animation.ObjectAnimator;
 import android.bluetooth.BluetoothDevice;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -24,6 +27,7 @@ import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -48,6 +52,7 @@ public class SendActivity extends AppCompatActivity {
     private static List<BluetoothDevice> devicesList = new ArrayList<>();
     private static DevicesAdapter adapter;
     public static BottomSheetDialog dialog;
+    public static int percentage =0 ;
     private final ActivityResultLauncher<Intent> filePickerLauncher =
             registerForActivityResult(
                     new ActivityResultContracts.StartActivityForResult(),
@@ -90,13 +95,23 @@ public class SendActivity extends AppCompatActivity {
             public void onDeviceClick(BluetoothDevice device,View v) {
                BluetoothTools.sendFile(Fileuri,device,SendActivity.this);
                 v.findViewWithTag(device.getName()).setVisibility(View.VISIBLE);
+
             }
         });
 
         ImageView sendButton = findViewById(R.id.sendLogo);
         sendButton.setOnClickListener(v -> {
+            devicesList.clear();
             StorageTools.openFilePicker(this,filePickerLauncher);
 
+        });
+
+        ImageView folder = findViewById(R.id.folder);
+        folder.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                StorageTools.opendirectory(SendActivity.this);
+            }
         });
 
 
@@ -106,9 +121,11 @@ public class SendActivity extends AppCompatActivity {
 
 
     public  void updateSending(int persentage){
+
         findViewById(R.id.SendLogoLayout).setVisibility(View.INVISIBLE);
         findViewById(R.id.SendingFile).setVisibility(View.VISIBLE);
-        ((TextView)findViewById(R.id.SendFile)).setText(persentage+"%");
+        ((TextView)findViewById(R.id.SendFile)).setText(SendActivity.percentage+"%");
+        SendActivity.percentage = persentage;
 
     }
     private void showDevices(){
@@ -119,6 +136,25 @@ public class SendActivity extends AppCompatActivity {
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         recyclerView.setAdapter(adapter);
         dialog.show();
+    }
+    public void flipCard(TextView view){
+        ObjectAnimator flipOut = ObjectAnimator.ofFloat(view, "rotationY", 0f, 90f);
+        flipOut.setDuration(300); // Duration of the flip-out animation
+
+        flipOut.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                // After flip-out is complete, change the text and flip back to show it
+                view.setText("");
+//                view.setRotationY(180);
+                view.setBackground(ContextCompat.getDrawable(SendActivity.this,R.drawable.encheck));
+                ObjectAnimator flipIn = ObjectAnimator.ofFloat(view, "rotationY", 270f, 360f);
+                flipIn.setDuration(300); // Duration of the flip-in animation
+                flipIn.start();
+            }
+        });
+
+        flipOut.start();
     }
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {

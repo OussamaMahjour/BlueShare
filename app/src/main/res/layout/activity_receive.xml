@@ -7,11 +7,13 @@
     android:layout_height="match_parent"
     android:background="@color/white">
 
-    <RelativeLayout
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:padding="10dp"
         android:background="@color/BlueCiel"
+      android:foregroundGravity="center_vertical"
+
         >
 
         <ImageView
@@ -19,8 +21,22 @@
             android:layout_height="40dp"
             android:background="@drawable/pngtreewhite_direction_arrow_right_icon_4539096"
             android:rotation="180"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
             />
-    </RelativeLayout>
+
+        <ImageView
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:background="@drawable/folder"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            android:id="@+id/folder"
+            />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
     <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

@@ -5,15 +5,18 @@ import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Environment;
 import android.provider.OpenableColumns;
 import android.util.Log;
+import android.widget.Toast;
 
 import androidx.activity.result.ActivityResult;
 import androidx.activity.result.ActivityResultCallback;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.FileProvider;
 
 
 import com.oussama.blueshare.SendActivity;
@@ -35,6 +38,31 @@ public class StorageTools {
         // Launch the file picker
         filePickerLauncher.launch(intent);
         return FileUri;
+    }
+    public static void opendirectory(AppCompatActivity context)
+    {
+        File directory;
+
+        if (Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState())) {
+            directory = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "BlueShare");
+            if (!directory.exists()) {
+                if (!directory.mkdirs()) {
+                    Log.e("StorageTools", "Failed to create directory: " + directory.getAbsolutePath());
+                    // Fallback to internal storage
+                    directory = new File(context.getFilesDir(), "BlueShare");
+                    directory.mkdirs();
+                }
+            }
+        } else {
+            Log.e("StorageTools", "External storage not available. Using internal storage.");
+            directory = new File(context.getFilesDir(), "BlueShare");
+            directory.mkdirs();
+        }
+        String path =Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)+"/BlueShare";
+        Uri uri = Uri.parse(path);
+        Intent intent = new Intent(Intent.ACTION_PICK);
+        intent.setDataAndType(uri, "*/*");
+        context.startActivity(intent);
     }
 
     public static void saveFile(byte[] fileData,AppCompatActivity context,String fileName){

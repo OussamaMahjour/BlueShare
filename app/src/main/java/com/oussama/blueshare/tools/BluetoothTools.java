@@ -20,6 +20,7 @@ import androidx.core.app.ActivityCompat;
 
 import com.oussama.blueshare.DevicesAdapter;
 import com.oussama.blueshare.R;
+import com.oussama.blueshare.SendActivity;
 import com.oussama.blueshare.Threads.ConnectThread;
 import com.oussama.blueshare.Threads.StreamThread;
 
@@ -38,8 +39,8 @@ public class BluetoothTools {
     public static UUID APP_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
 
     public static void sendFile(Uri file, BluetoothDevice device, AppCompatActivity context){
-        Log.d(TAG,"testing");
         ConnectThread connectThread = new ConnectThread(device,(socket)->{
+            ((SendActivity)context).dialog.dismiss();
             StreamThread streamThread = new StreamThread(socket,context);
             try {
                 InputStream inputStream = context.getContentResolver().openInputStream(file);

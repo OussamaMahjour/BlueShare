@@ -49,16 +49,10 @@ public  class ConnectThread extends Thread {
 
     @SuppressLint("MissingPermission")
     public void run() {
-        if(isPaired) {
-            try {
-                mmSocket.close();
-                isPaired=false;
-            } catch (IOException e) {
-                Log.d(TAG,"Couldn't Close the socket");
-            }
-
+        if (mmSocket.isConnected()) {
+            Log.d(TAG, "Socket is already connected.");
+            return;
         }
-
         try {
             BluetoothAdapter.getDefaultAdapter().cancelDiscovery();
         }catch (Exception e){
@@ -66,9 +60,7 @@ public  class ConnectThread extends Thread {
         }
         try {
             mmSocket.connect();
-            isPaired = true;
             onConnect.accept(mmSocket);
-
         } catch (IOException connectException) {
             Log.e(TAG, "Enable to Connect to socket "+connectException.getMessage());
             try {
